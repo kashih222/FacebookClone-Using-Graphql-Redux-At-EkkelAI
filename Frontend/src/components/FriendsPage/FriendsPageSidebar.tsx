@@ -5,7 +5,7 @@ const FriendsPageSidebar = () => {
   return (
     <div>
        <div className="w-90 h-screen bg-[#FFFFFF] flex-col shadow-lg sticky top-10  overflow-y-auto">
-          <div className="flex items-center justify-between px-3 py-2">
+          <div className="flex items-center justify-between px-3 py-4">
             <div>
               <p className="font-bold text-2xl">Friends</p>
             </div>

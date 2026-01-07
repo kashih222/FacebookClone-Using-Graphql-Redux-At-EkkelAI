@@ -1,18 +1,34 @@
 import { useEffect, useState, useImperativeHandle, forwardRef, useCallback } from "react";
 import Post from "../CreatePostPage/PostPage/Post";
 import { GET_MY_POSTS_QUERY } from "../../GraphqlOprations/queries";
-import { REACT_POST_MUTATION, ADD_COMMENT_MUTATION } from "../../GraphqlOprations/mutations";
+import { REACT_POST_MUTATION, GET_VIEW_URLS_MUTATION } from "../../GraphqlOprations/mutations";
 
 // Update interfaces based on actual data structure
+type AuthorLike = {
+  id?: string;
+  firstName?: string;
+  surname?: string;
+  name?: string;
+} | string;
+
 interface GPost {
   id: string;
   content?: string;
   imageUrl?: string | null;
   imageUrls?: string[];
-  author: { id: string; firstName?: string; surname?: string; name?: string } | string; // Can be object OR string
+  author: AuthorLike;
   createdAt: string;
-  comments?: any[];
-  reactions?: any[];
+  comments?: {
+    id: string;
+    content: string;
+    createdAt: string;
+    author?: AuthorLike;
+  }[];
+  reactions?: {
+    type: string;
+    createdAt: string;
+    user: { id: string };
+  }[];
 }
 
 interface UIPost {
@@ -24,7 +40,7 @@ interface UIPost {
     verified: boolean 
   };
   content: string;
-  image: string | null;
+  images: string[];
   likes: number;
   comments: { 
     id: string; 
@@ -41,15 +57,14 @@ interface PersonalFeedHandle {
   refresh: () => void;
 }
 
-interface PersonalFeedProps {
-  // Add any props your component needs here
-}
+type PersonalFeedProps = Record<string, never>;
 
 const PersonalFeed = forwardRef<PersonalFeedHandle, PersonalFeedProps>((_props, ref) => {
   const [allPosts, setAllPosts] = useState<UIPost[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  console.log("All posts:", allPosts); 
   const formatTimeAgo = (dateString: string | null | undefined): string => {
     if (!dateString) {
       return "Recently";
@@ -98,7 +113,7 @@ const PersonalFeed = forwardRef<PersonalFeedHandle, PersonalFeedProps>((_props, 
   };
 
   // Helper to get user initials for avatar - FIXED VERSION
-  const getUserInitials = (author: any): string => {
+  const getUserInitials = (author: AuthorLike | undefined): string => {
     if (!author) return 'U';
     
     if (typeof author === 'string') {
@@ -126,7 +141,7 @@ const PersonalFeed = forwardRef<PersonalFeedHandle, PersonalFeedProps>((_props, 
   };
 
   // Helper to get author name 
-  const getAuthorName = (author: any): string => {
+  const getAuthorName = (author: AuthorLike | undefined): string => {
     if (!author) return "Unknown User";
     
     if (typeof author === 'string') {
@@ -174,14 +189,29 @@ const PersonalFeed = forwardRef<PersonalFeedHandle, PersonalFeedProps>((_props, 
       console.log("Full raw posts data:", JSON.stringify(list, null, 2));
       
       // Process posts
+      const sanitizeUrl = (url?: string | null): string | null => {
+        if (!url || typeof url !== 'string') return null;
+        const trimmed = url.trim();
+        const withoutTicks = trimmed.replace(/^`|`$/g, '');
+        const withoutQuotes = withoutTicks.replace(/^"|"$|^'|'$/g, '');
+        return withoutQuotes;
+      };
+
       const mapped: UIPost[] = list.map((post) => {
-        // Debug individual post
-        console.log("Processing post author:", post.author, "Type:", typeof post.author);
-        
         const authorName = getAuthorName(post.author);
         const authorInitials = getUserInitials(post.author);
         const postTime = formatTimeAgo(post.createdAt);
         
+        const primary = sanitizeUrl(post.imageUrl);
+        const gallery = (post.imageUrls || [])
+          .map((u) => sanitizeUrl(u))
+          .filter((u): u is string => !!u);
+        const images = [
+          ...(primary ? [primary] : []),
+          ...gallery.filter((u) => u !== primary),
+        ];
+        console.log("Gallery:", gallery);
+
         return {
           id: post.id,
           user: {
@@ -191,14 +221,14 @@ const PersonalFeed = forwardRef<PersonalFeedHandle, PersonalFeedProps>((_props, 
             verified: true,
           },
           content: post.content || "No content",
-          image: post.imageUrl || (post.imageUrls?.[0] ?? null),
+          images,
           likes: post.reactions?.length || 0,
-          comments: (post.comments || []).map((comment: any) => ({
+          comments: (post.comments || []).map((comment) => ({
             id: comment.id || Math.random().toString(),
-            authorName: getAuthorName(comment.author || comment.user),
-            text: comment.content || "",
+            authorName: getAuthorName(comment.author ?? "Unknown User"),
+            text: (comment.content || "").trim(),
             createdAt: formatTimeAgo(comment.createdAt),
-            authorAvatar: getUserInitials(comment.author || comment.user),
+            authorAvatar: getUserInitials(comment.author ?? "U"),
           })),
           shares: 0,
           liked: false,
@@ -218,7 +248,33 @@ const PersonalFeed = forwardRef<PersonalFeedHandle, PersonalFeedProps>((_props, 
         return dateB - dateA;
       });
       
-      setAllPosts(mapped);
+      const allUrls = Array.from(
+        new Set(
+          mapped.flatMap((p) => p.images).filter((u) => typeof u === "string")
+        )
+      );
+      let urlMap: Record<string, string> = {};
+      if (allUrls.length > 0) {
+        const signRes = await fetch(import.meta.env.VITE_GRAPHQL_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            query: GET_VIEW_URLS_MUTATION,
+            variables: { urls: allUrls },
+          }),
+        });
+        const signJson = await signRes.json();
+        if (!signJson.errors && signJson.data?.getViewUrls) {
+          const signed: string[] = signJson.data.getViewUrls;
+          urlMap = Object.fromEntries(allUrls.map((u, i) => [u, signed[i]]));
+        }
+      }
+      const replaced = mapped.map((p) => ({
+        ...p,
+        images: p.images.map((u) => urlMap[u] || u),
+      }));
+      setAllPosts(replaced);
     } catch (error) {
       console.error("Failed to load posts:", error);
       setAllPosts([]);
@@ -230,6 +286,8 @@ const PersonalFeed = forwardRef<PersonalFeedHandle, PersonalFeedProps>((_props, 
   useEffect(() => {
     loadPosts();
   }, [refreshTrigger, loadPosts]);
+
+  
 
   useImperativeHandle(ref, () => ({
     refresh: () => {
@@ -295,36 +353,36 @@ const PersonalFeed = forwardRef<PersonalFeedHandle, PersonalFeedProps>((_props, 
     }
   };
 
-  const handleAddComment = async (postId: string, commentText: string) => {
-    try {
-      if (!commentText.trim()) return;
+  // const handleAddComment = async (postId: string, commentText: string) => {
+  //   try {
+  //     if (!commentText.trim()) return;
       
-      const uiPost = allPosts.find(p => p.id === postId);
-      if (!uiPost) return;
+  //     const uiPost = allPosts.find(p => p.id === postId);
+  //     if (!uiPost) return;
       
-      const res = await fetch(import.meta.env.VITE_GRAPHQL_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          query: ADD_COMMENT_MUTATION,
-          variables: { input: { postId: uiPost.id, content: commentText } }
-        }),
-      });
+  //     const res = await fetch(import.meta.env.VITE_GRAPHQL_URL, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       credentials: "include",
+  //       body: JSON.stringify({
+  //         query: ADD_COMMENT_MUTATION,
+  //         variables: { input: { postId: uiPost.id, content: commentText } }
+  //       }),
+  //     });
       
-      const json = await res.json();
+  //     const json = await res.json();
       
-      if (json.errors && json.errors.length) {
-        console.error("Error adding comment:", json.errors[0].message);
-        return;
-      }
+  //     if (json.errors && json.errors.length) {
+  //       console.error("Error adding comment:", json.errors[0].message);
+  //       return;
+  //     }
       
-      setRefreshTrigger(prev => prev + 1);
+  //     setRefreshTrigger(prev => prev + 1);
       
-    } catch (error) {
-      console.error("Failed to add comment:", error);
-    }
-  };
+  //   } catch (error) {
+  //     console.error("Failed to add comment:", error);
+  //   }
+  // };
 
   if (loading) {
     return (
@@ -344,7 +402,6 @@ const PersonalFeed = forwardRef<PersonalFeedHandle, PersonalFeedProps>((_props, 
           key={post.id}
           post={post}
           onLike={() => handleLike(post.id)}
-          onAddComment={(commentText) => handleAddComment(post.id, commentText)}
         />
       ))}
     </div>

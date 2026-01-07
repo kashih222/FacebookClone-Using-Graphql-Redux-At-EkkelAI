@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ThumbsUp, MessageCircle, Share2, MoreHorizontal, Send, Smile, Image as ImageIcon, User, Globe } from 'lucide-react';
 import { FaHeart, FaThumbsUp } from 'react-icons/fa';
+import MediaItem from '../../MediaItems/MediaItems';
+import { ADD_COMMENT_MUTATION } from '../../../GraphqlOprations/mutations';
 
 interface PostProps {
   post: {
@@ -8,28 +10,35 @@ interface PostProps {
     user: {
       name: string;
       avatar: string;
-      time: string; // This should be the formatted time from PersonalFeed
+      time: string; 
       verified: boolean;
     };
     content: string;
-    image: string | null;
+    images: string[];
     likes: number;
-    comments: { id: string; authorName: string; text: string; createdAt: string }[];
+    comments: { 
+      id: string; 
+      authorName: string; 
+      text: string; 
+      createdAt: string 
+    }[];
     shares: number;
     liked: boolean;
   };
   onLike: (postId: string) => void;
-  onAddComment: (postId: string, commentText: string) => void;
 }
 
-const Post: React.FC<PostProps> = ({ post, onLike, onAddComment }) => {
+const Post: React.FC<PostProps> = ({ post, onLike }) => {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [comments, setComments] = useState(post.comments || []);
   const [showReactions, setShowReactions] = useState(false);
-  type ReactionType = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'angry';
   const [reaction, setReaction] = useState<ReactionType | null>(null);
+
   const reactionsRef = useRef<HTMLDivElement>(null);
+
+  type ReactionType = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'angry';
+
 
   const reactions: Array<{ type: ReactionType; icon: string; label: string; color: string }> = [
     { type: 'like', icon: '👍', label: 'Like', color: 'text-blue-600' },
@@ -40,15 +49,12 @@ const Post: React.FC<PostProps> = ({ post, onLike, onAddComment }) => {
     { type: 'angry', icon: '😠', label: 'Angry', color: 'text-red-700' },
   ];
 
-  // FIXED: formatRelativeTime function
   const formatRelativeTime = (timeString: string): string => {
-    // If timeString is already formatted (like "44m ago"), return it as is
     if (timeString.includes('ago') || timeString.includes('Just now') || timeString === 'Recently') {
       return timeString;
     }
     
     try {
-      // Try to parse as ISO date
       const date = new Date(timeString);
       
       if (isNaN(date.getTime())) {
@@ -124,6 +130,36 @@ const Post: React.FC<PostProps> = ({ post, onLike, onAddComment }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleAddComment = async (postId: string, commentText: string) => {
+    try {
+      console.log("commentText", commentText);
+      if (!commentText.trim()) return;
+
+     
+      const res = await fetch(import.meta.env.VITE_GRAPHQL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          query: ADD_COMMENT_MUTATION,
+          variables: { input: { postId, content: commentText } },
+        }),
+      });
+
+      const json = await res.json();
+
+      if (json.errors && json.errors.length) {
+        console.error("Error adding comment:", json.errors[0].message);
+        return;
+      }
+
+      // Refresh posts after adding comment
+    } catch (error) {
+      console.error("Failed to add comment:", error);
+    }
+  };
+
+
   const handleSubmitComment = (e: React.FormEvent) => {
     e.preventDefault();
     if (commentText.trim()) {
@@ -134,9 +170,10 @@ const Post: React.FC<PostProps> = ({ post, onLike, onAddComment }) => {
         createdAt: new Date().toISOString()
       };
       setComments([newComment, ...comments]);
-      onAddComment(post.id, commentText);
+      handleAddComment(post.id, commentText);
       setCommentText('');
     }
+    
   };
 
   const formatNumber = (num: number) => {
@@ -157,8 +194,8 @@ const Post: React.FC<PostProps> = ({ post, onLike, onAddComment }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
       {/* Post Header */}
-      <div className="p-4">
-        <div className="flex items-center justify-between">
+      <div className="">
+        <div className="flex items-center justify-between p-4">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-linear-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
               {post.user.avatar}
@@ -179,26 +216,50 @@ const Post: React.FC<PostProps> = ({ post, onLike, onAddComment }) => {
         </div>
 
         {/* Post Content */}
-        <div className="mt-4">
-          <p className="text-gray-800 text-lg whitespace-pre-line leading-relaxed">
+        <div className="mt-4 ">
+          <p className="text-gray-800 px-4 text-lg whitespace-pre-line leading-relaxed">
             {post.content}
           </p>
           
-          {/* Post Image */}
-          {post.image && (
-            <div className="mt-4 rounded-lg overflow-hidden">
-              <div className="w-full h-96 bg-linear-to-r from-blue-100 to-purple-100 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-4xl mb-2">📷</div>
-                  <p className="text-gray-600">Post Image</p>
+          {/* Post Media */}
+          {post.images && post.images.length > 0 && (
+            <div className="mt-4  overflow-hidden">
+              {post.images.length === 1 && (
+                <MediaItem url={post.images[0]} alt="Post media" className="w-full  object-cover" />
+              )}
+              {post.images.length === 2 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {post.images.slice(0, 2).map((url, idx) => (
+                    <MediaItem key={idx} url={url} alt={`Post media ${idx + 1}`} className="w-full h-64 object-cover" />
+                  ))}
                 </div>
-              </div>
+              )}
+              {post.images.length >= 3 && (
+                <div className="grid grid-cols-2 gap-2">
+                  <MediaItem url={post.images[0]} alt="Post media 1" className="col-span-2 w-full  object-cover" />
+                  {post.images.slice(1, 4).map((url, idx) => {
+                    const isOverflow = idx === 2 && post.images.length > 4;
+                    return (
+                      <div key={idx} className="relative">
+                        <MediaItem url={url} alt={`Post media ${idx + 2}`} className="w-full  object-cover" />
+                        {isOverflow && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <span className="text-white font-semibold text-xl">
+                              +{post.images.length - 4}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Post Stats */}
-        <div className="mt-4 pt-4 border-t border-gray-200">
+        <div className=" pt-3 px-4 border-t border-gray-200">
           <div className="flex items-center justify-between text-gray-600">
             <div className="flex items-center space-x-4">
               <div className="flex items-center">
@@ -300,7 +361,6 @@ const Post: React.FC<PostProps> = ({ post, onLike, onAddComment }) => {
       {/* Comments Section */}
       {showComments && (
         <div className="border-t border-gray-200 p-4 bg-gray-50">
-          {/* Add Comment */}
           <form onSubmit={handleSubmitComment} className="mb-4">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-white">

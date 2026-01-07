@@ -20,30 +20,7 @@ export const typeDefs = `#graphql
     gender: String!
   }
 
-  type Query {
-    greet: String
-    me: User
-    posts: [Post!]!
-    myPosts: [Post!]!
-    users: [User!]!
-    myFriends: [User!]!
-    friendSuggestions: [User!]!
-    friendRequests: [FriendRequest!]!
-  }
-
-  type Mutation {
-    signup(input: SignupInput!): User!
-    login(email: String!, password: String!): AuthPayload!
-    logout: Boolean!
-    createPost(input: CreatePostInput!): Post!
-    getUploadTargets(requests: [UploadRequest!]!): [UploadTarget!]!
-    addFriend(userId: ID!): Boolean!
-    sendFriendRequest(userId: ID!): Boolean!
-    acceptFriendRequest(requestId: ID!): Boolean!
-    rejectFriendRequest(requestId: ID!): Boolean!
-    addComment(input: AddCommentInput!): Post!
-    reactPost(input: ReactPostInput!): Post!
-  }
+ 
 
   type AuthPayload {
     token: String!
@@ -57,6 +34,12 @@ export const typeDefs = `#graphql
     wow
     sad
     angry
+  }
+
+  
+  input ReactPostInput {
+    postId: ID!
+    type: ReactionType!
   }
 
   type Reaction {
@@ -81,6 +64,7 @@ export const typeDefs = `#graphql
     angry: Int!
   }
 
+  
   type Post {
     id: ID!
     content: String!
@@ -93,6 +77,13 @@ export const typeDefs = `#graphql
     reactionSummary: ReactionSummary!
   }
 
+  type Comment {
+    id: ID!
+    content: String!
+    author: User!
+    createdAt: String!
+  }
+    
   input CreatePostInput {
     content: String!
     imageUrl: String
@@ -104,19 +95,21 @@ export const typeDefs = `#graphql
     content: String!
   }
 
-  input ReactPostInput {
-    postId: ID!
-    type: ReactionType!
-  }
   
   input UploadRequest {
     filename: String!
     contentType: String!
   }
   
+  type UploadField {
+    key: String!
+    value: String!
+  }
+  
   type UploadTarget {
     uploadUrl: String!
     publicUrl: String!
+    fields: [UploadField!]
   }
 
   type FriendRequest {
@@ -125,5 +118,31 @@ export const typeDefs = `#graphql
     to: User!
     status: String!
     createdAt: String!
+  }
+
+  type Query {
+    greet: String
+    me: User
+    posts: [Post!]!
+    myPosts: [Post!]!
+    users: [User!]!
+    myFriends: [User!]!
+    friendSuggestions: [User!]!
+    friendRequests: [FriendRequest!]!
+  }
+
+  type Mutation {
+    signup(input: SignupInput!): User!
+    login(email: String!, password: String!): AuthPayload!
+    logout: Boolean!
+    createPost(input: CreatePostInput!): Post!
+    getUploadTargets(requests: [UploadRequest!]!): [UploadTarget!]!
+    getViewUrls(urls: [String!]!): [String!]!
+    addFriend(userId: ID!): Boolean!
+    sendFriendRequest(userId: ID!): Boolean!
+    acceptFriendRequest(requestId: ID!): Boolean!
+    rejectFriendRequest(requestId: ID!): Boolean!
+    addComment(input: AddCommentInput!): Post!
+    reactPost(input: ReactPostInput!): Post!
   }
 `;

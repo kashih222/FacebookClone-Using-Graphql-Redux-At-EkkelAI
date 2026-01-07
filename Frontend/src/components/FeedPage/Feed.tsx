@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Post from "../CreatePostPage/PostPage/Post";
 import { GET_ALL_POSTS_QUERY } from "../../GraphqlOprations/queries";
 import {
   REACT_POST_MUTATION,
-  ADD_COMMENT_MUTATION,
 } from "../../GraphqlOprations/mutations";
+import { GET_VIEW_URLS_MUTATION } from "../../GraphqlOprations/mutations";
 
 interface FeedProps {
   refreshTrigger?: number;
@@ -39,7 +39,7 @@ interface UIPost {
     verified: boolean;
   };
   content: string;
-  image: string | null;
+  images: string[];
   likes: number;
   comments: {
     id: string;
@@ -55,7 +55,14 @@ const Feed = ({ refreshTrigger = 0 }: FeedProps) => {
   const [allPosts, setAllPosts] = useState<UIPost[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Helper function to format time ago
+  const sanitizeUrl = (url?: string | null): string | null => {
+    if (!url || typeof url !== "string") return null;
+    const trimmed = url.trim();
+    const withoutTicks = trimmed.replace(/^`|`$/g, "");
+    const withoutQuotes = withoutTicks.replace(/^"|"$|^'|'$/g, "");
+    return withoutQuotes;
+  };
+
   const formatTimeAgo = (dateString: string | null | undefined): string => {
     if (!dateString) {
       return "Recently";
@@ -105,7 +112,6 @@ const Feed = ({ refreshTrigger = 0 }: FeedProps) => {
     }
   };
 
-  // Helper to get user initials
   const getUserInitials = (firstName: string, surname: string): string => {
     const first = firstName?.[0] || "";
     const last = surname?.[0] || "";
@@ -116,9 +122,10 @@ const Feed = ({ refreshTrigger = 0 }: FeedProps) => {
     _reactions: { type: string; createdAt: string; user: { id: string } }[]
   ): boolean => {
     return false;
+    console.log(_reactions)
   };
 
-  const loadPosts = async () => {
+  const loadPosts = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch(import.meta.env.VITE_GRAPHQL_URL, {
@@ -148,6 +155,15 @@ const Feed = ({ refreshTrigger = 0 }: FeedProps) => {
         const shareReactions =
           p.reactions?.filter((r) => r.type === "share") || [];
 
+        const primary = sanitizeUrl(p.imageUrl);
+        const gallery = (p.imageUrls || [])
+          .map((u) => sanitizeUrl(u))
+          .filter((u): u is string => !!u);
+        const images = [
+          ...(primary ? [primary] : []),
+          ...gallery.filter((u) => u !== primary),
+        ];
+
         return {
           id: p.id,
           user: {
@@ -157,12 +173,12 @@ const Feed = ({ refreshTrigger = 0 }: FeedProps) => {
             verified: true,
           },
           content: p.content,
-          image: p.imageUrl || (p.imageUrls?.[0] ?? null),
+          images,
           likes: likeReactions.length,
           comments: (p.comments || []).map((c) => ({
             id: c.id,
             authorName: `${c.author.firstName} ${c.author.surname}`,
-            text: c.content,
+            text: (c.content || "").trim(),
             createdAt: formatTimeAgo(c.createdAt),
           })),
           shares: shareReactions.length,
@@ -183,18 +199,44 @@ const Feed = ({ refreshTrigger = 0 }: FeedProps) => {
         return dateB - dateA; // Newest first
       });
 
-      setAllPosts(mapped);
+      const allUrls = Array.from(
+        new Set(
+          mapped.flatMap((p) => p.images).filter((u) => typeof u === "string")
+        )
+      );
+      let urlMap: Record<string, string> = {};
+      if (allUrls.length > 0) {
+        const signRes = await fetch(import.meta.env.VITE_GRAPHQL_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            query: GET_VIEW_URLS_MUTATION,
+            variables: { urls: allUrls },
+          }),
+        });
+        const signJson = await signRes.json();
+        if (!signJson.errors && signJson.data?.getViewUrls) {
+          const signed: string[] = signJson.data.getViewUrls;
+          urlMap = Object.fromEntries(allUrls.map((u, i) => [u, signed[i]]));
+        }
+      }
+      const replaced = mapped.map((p) => ({
+        ...p,
+        images: p.images.map((u) => urlMap[u] || u),
+      }));
+      setAllPosts(replaced);
     } catch (error) {
       console.error("Failed to load posts:", error);
       setAllPosts([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadPosts();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, loadPosts]);
 
   const handleLike = async (postId: string) => {
     try {
@@ -259,36 +301,6 @@ const Feed = ({ refreshTrigger = 0 }: FeedProps) => {
     }
   };
 
-  const handleAddComment = async (postId: string, commentText: string) => {
-    try {
-      if (!commentText.trim()) return;
-
-      const uiPost = allPosts.find((p) => p.id === postId);
-      if (!uiPost) return;
-
-      const res = await fetch(import.meta.env.VITE_GRAPHQL_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          query: ADD_COMMENT_MUTATION,
-          variables: { input: { postId: uiPost.id, content: commentText } },
-        }),
-      });
-
-      const json = await res.json();
-
-      if (json.errors && json.errors.length) {
-        console.error("Error adding comment:", json.errors[0].message);
-        return;
-      }
-
-      // Refresh posts after adding comment
-      loadPosts();
-    } catch (error) {
-      console.error("Failed to add comment:", error);
-    }
-  };
 
   if (loading) {
     return (
@@ -298,19 +310,7 @@ const Feed = ({ refreshTrigger = 0 }: FeedProps) => {
     );
   }
 
-  if (allPosts.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-2xl text-gray-500">📝</span>
-        </div>
-        <h3 className="text-xl font-semibold text-gray-700 mb-2">
-          No posts yet
-        </h3>
-        <p className="text-gray-500">Be the first to create a post!</p>
-      </div>
-    );
-  }
+ 
 
   return (
     <div className="space-y-6">
@@ -319,7 +319,6 @@ const Feed = ({ refreshTrigger = 0 }: FeedProps) => {
           key={post.id}
           post={post}
           onLike={() => handleLike(post.id)}
-          onAddComment={(commentText) => handleAddComment(post.id, commentText)}
         />
       ))}
     </div>

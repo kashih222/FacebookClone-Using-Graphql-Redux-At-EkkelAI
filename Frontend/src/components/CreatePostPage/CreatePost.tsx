@@ -1,11 +1,9 @@
 import { BookImage, Globe, Smile, Video, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../Redux Toolkit/hooks";
+import type { RootState } from "../../Redux Toolkit/Store";
 import { fetchMe } from "../../Redux Toolkit/slices/userSlice";
-import {
-  CREATE_POST_MUTATION,
-  GET_UPLOAD_TARGETS_MUTATION,
-} from "../../GraphqlOprations/mutations";
+import { CREATE_POST_MUTATION, GET_UPLOAD_TARGETS_MUTATION, } from "../../GraphqlOprations/mutations";
 
 interface CreatePostProps {
   onPostCreated?: () => void;
@@ -17,7 +15,7 @@ const CreatePost = ({ onPostCreated }: CreatePostProps) => {
   const [open, setOpen] = useState(false);
   const [visibility, setVisibility] = useState("Public");
   const dispatch = useAppDispatch();
-  const me = useAppSelector((s) => s.user.user);
+  const me = useAppSelector((s: RootState) => s.user.user);
   const displayName = me ? `${me.firstName} ${me.surname}` : "User";
   const initials = displayName
     .split(" ")
@@ -62,7 +60,7 @@ const CreatePost = ({ onPostCreated }: CreatePostProps) => {
         const targets: {
           uploadUrl: string;
           publicUrl: string;
-          fields?: Record<string, string>;
+          fields?: { key: string; value: string }[] | null;
         }[] = presignJson.data?.getUploadTargets || [];
 
         if (targets.length !== files.length) {
@@ -73,13 +71,12 @@ const CreatePost = ({ onPostCreated }: CreatePostProps) => {
           const file = files[i];
           const target = targets[i];
 
-          if (target.fields) {
+          if (target.fields && target.fields.length > 0) {
+            // Use POST method (presigned POST with form fields)
             const formData = new FormData();
-
-            Object.entries(target.fields).forEach(([key, value]) => {
+            target.fields.forEach(({ key, value }) => {
               formData.append(key, value);
             });
-
             formData.append("file", file);
 
             const uploadRes = await fetch(target.uploadUrl, {
@@ -88,19 +85,58 @@ const CreatePost = ({ onPostCreated }: CreatePostProps) => {
             });
 
             if (!uploadRes.ok) {
-              throw new Error(`Upload failed: ${uploadRes.statusText}`);
+              throw new Error(
+                `Upload failed: ${uploadRes.statusText} (${uploadRes.status})`
+              );
             }
           } else {
+            const uploadUrl = new URL(target.uploadUrl);
+            const searchParams = uploadUrl.searchParams;
+
+            console.log(
+              "Signed URL params:",
+              Object.fromEntries(searchParams.entries())
+            );
+
+            // Check what headers are signed
+            const signedHeaders = searchParams.get("X-Amz-SignedHeaders") || "";
+            console.log("Signed headers:", signedHeaders);
+
+            // Build headers exactly as signed
+            const headers: HeadersInit = {};
+
+            // If x-amz-acl is in signed headers, add it
+            if (signedHeaders.includes("x-amz-acl")) {
+              headers["x-amz-acl"] = "public-read";
+            }
+
+            // Send Content-Type header ONLY if it is part of the signed headers
+            if (signedHeaders.includes("content-type")) {
+              headers["Content-Type"] = file.type || "application/octet-stream";
+            }
+
+            console.log("Using headers:", headers);
+
+            // Try with minimal headers
             const uploadRes = await fetch(target.uploadUrl, {
               method: "PUT",
-              headers: {
-                "Content-Type": file.type || "application/octet-stream",
-              },
+              headers,
               body: file,
             });
 
             if (!uploadRes.ok) {
-              throw new Error(`Upload failed: ${uploadRes.statusText}`);
+              const errorText = await uploadRes.text();
+              console.error("Upload failed details:", {
+                status: uploadRes.status,
+                statusText: uploadRes.statusText,
+                error: errorText,
+                url: target.uploadUrl,
+                signedHeaders: signedHeaders,
+                headersUsed: headers,
+              });
+              throw new Error(
+                `Upload failed: ${uploadRes.status} ${uploadRes.statusText}`
+              );
             }
           }
         }

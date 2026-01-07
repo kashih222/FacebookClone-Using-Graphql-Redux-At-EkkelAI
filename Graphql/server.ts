@@ -11,6 +11,10 @@ import { resolvers } from "./resolver/resolver";
 
 dotenv.config();
 
+const resolverss = resolvers;
+
+console.log("Resolvers", resolverss.Mutation.addComment)
+
 const app = express();
 const allowedOrigins = (
   process.env.ALLOWED_ORIGINS?.split(",") || [

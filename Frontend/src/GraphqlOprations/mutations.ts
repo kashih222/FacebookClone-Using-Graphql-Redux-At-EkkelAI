@@ -52,10 +52,16 @@ export const GET_UPLOAD_TARGETS_MUTATION = `
     getUploadTargets(requests: $requests) {
       uploadUrl
       publicUrl
+      fields { key value }
     }
   }
 `;
 
+export const GET_VIEW_URLS_MUTATION = `
+  mutation GetViewUrls($urls: [String!]!) {
+    getViewUrls(urls: $urls)
+  }
+`;
 
 export const REACT_POST_MUTATION = `
   mutation ReactPost($input: ReactPostInput!) {
