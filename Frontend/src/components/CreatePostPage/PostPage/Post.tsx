@@ -197,21 +197,21 @@ const Post: React.FC<PostProps> = ({ post, onLike }) => {
       <div className="">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-linear-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+            <div className="w-10 h-10 bg-linear-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg cursor-pointer">
               {post.user.avatar}
             </div>
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 cursor-pointer">
                 <h3 className="font-bold text-gray-900">{post.user.name}</h3>
               </div>
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
+              <div title="Public" className="flex items-center space-x-2 text-sm text-gray-500 cursor-pointer">
                 <span>{post.user.time}</span>
-                <span><Globe className='w-4 h-4'/></span>
+                <span><Globe  className='w-4 h-4'/></span>
               </div>
             </div>
           </div>
           <button className="text-gray-500 hover:text-gray-700">
-            <MoreHorizontal className="w-5 h-5" />
+            <MoreHorizontal className="w-5 h-5 cursor-pointer" />
           </button>
         </div>
 
@@ -276,7 +276,7 @@ const Post: React.FC<PostProps> = ({ post, onLike }) => {
               
               <button 
                 onClick={() => setShowComments(!showComments)}
-                className="text-sm hover:underline"
+                className="text-sm  cursor-pointer"
               >
                 {formatNumber(post.comments.length)} comments
               </button>
@@ -288,11 +288,11 @@ const Post: React.FC<PostProps> = ({ post, onLike }) => {
       </div>
 
       {/* Post Actions with Reactions */}
-      <div className="border-gray-200 px-4">
+      <div className="border-gray-200 px-4 ">
         <div className="flex items-center relative">
           {/* Like Button with Reactions */}
           <div 
-            className="relative flex-1"
+            className="relative flex-1 "
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             ref={reactionsRef}
@@ -305,7 +305,7 @@ const Post: React.FC<PostProps> = ({ post, onLike }) => {
             >
               {reaction ? (
                 <div className="flex items-center space-x-2">
-                  <span className="text-xl">
+                  <span className="text-xl ">
                     {reactions.find(r => r.type === reaction)?.icon}
                   </span>
                   <span className="font-medium">
@@ -314,17 +314,20 @@ const Post: React.FC<PostProps> = ({ post, onLike }) => {
                 </div>
               ) : (
                 <>
-                  <ThumbsUp className="w-5 h-5" />
-                  <span className="font-medium">Like</span>
+                 <div className='cursor-pointer flex gap-2 items-center '>
+                   <ThumbsUp className="w-5 h-5 " />
+                  <span className="font-medium ">Like</span>
+                 </div>
                 </>
               )}
             </button>
 
             {/* Reactions Popup */}
             {showReactions && (
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-white rounded-full shadow-lg border border-gray-200 p-1 flex items-center space-x-1 z-50">
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-white rounded-full shadow-lg border border-gray-200 p-1 flex items-center space-x-1 z-50 ">
                 {reactions.map((react) => (
                   <button
+                    className='cursor-pointer'
                     key={react.type}
                     onClick={() => handleReaction(react.type)}
                     onMouseEnter={() => setReaction(react.type)}
@@ -344,14 +347,14 @@ const Post: React.FC<PostProps> = ({ post, onLike }) => {
           {/* Comment Button */}
           <button
             onClick={() => setShowComments(!showComments)}
-            className="flex-1 flex items-center justify-center py-3 space-x-2 text-gray-600 hover:text-gray-800"
+            className="flex-1 flex items-center justify-center py-3 space-x-2 text-gray-600 hover:text-gray-800 cursor-pointer"
           >
             <MessageCircle className="w-5 h-5" />
             <span className="font-medium">Comment</span>
           </button>
           
           {/* Share Button */}
-          <button className="flex-1 flex items-center justify-center py-3 space-x-2 text-gray-600 hover:text-gray-800">
+          <button className="flex-1 flex items-center justify-center py-3 space-x-2 text-gray-600 hover:text-gray-800 cursor-pointer">
             <Share2 className="w-5 h-5" />
             <span className="font-medium">Share</span>
           </button>

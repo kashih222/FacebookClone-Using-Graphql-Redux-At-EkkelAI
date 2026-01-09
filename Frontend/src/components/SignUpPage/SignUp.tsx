@@ -4,6 +4,7 @@ import { IoInformationCircleOutline } from "react-icons/io5";
 import LoginSignUpFooter from "../Login&Signup Footer/LoginSignUpFooter";
 import { Link, useNavigate } from "react-router-dom";
 import { SIGNUP_MUTATION } from "../../GraphqlOprations/mutations";
+import toast from "react-hot-toast";
 
 function SignUp() {
   const [formData, setFormData] = useState({
@@ -75,13 +76,13 @@ function SignUp() {
       });
       const json = await res.json();
       if (json.errors && json.errors.length) {
-        alert(json.errors[0].message || "Signup failed");
+        toast.error(json.errors[0].message || "Signup failed");
         return;
       }
       navigate("/login");
     } catch (err) {
       console.log(err)
-      alert("Network error");
+      toast.error("Network error");
     }
   };
 

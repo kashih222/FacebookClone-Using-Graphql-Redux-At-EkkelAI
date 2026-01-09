@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from "../../Redux Toolkit/hooks";
 import type { RootState } from "../../Redux Toolkit/Store";
 import { fetchMe } from "../../Redux Toolkit/slices/userSlice";
 import { CREATE_POST_MUTATION, GET_UPLOAD_TARGETS_MUTATION, } from "../../GraphqlOprations/mutations";
+import toast from "react-hot-toast";
 
 interface CreatePostProps {
   onPostCreated?: () => void;
@@ -146,7 +147,7 @@ const CreatePost = ({ onPostCreated }: CreatePostProps) => {
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : "Image upload failed";
-        alert(message);
+        toast.error(message);
         console.error("Upload error:", err);
         return;
       }
@@ -172,7 +173,7 @@ const CreatePost = ({ onPostCreated }: CreatePostProps) => {
       const json = await res.json();
 
       if (json.errors && json.errors.length) {
-        alert(json.errors[0].message || "Create post failed");
+        toast.error(json.errors[0].message || "Create post failed");
         return;
       }
 
@@ -184,7 +185,7 @@ const CreatePost = ({ onPostCreated }: CreatePostProps) => {
         onPostCreated();
       }
     } catch (error) {
-      alert("Failed to create post");
+      toast.error("Failed to create post");
       console.error("Post creation error:", error);
     }
   };

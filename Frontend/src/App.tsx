@@ -8,10 +8,12 @@ import ProfilePage from "./components/ProfilePage/ProfilePage";
 import FriendsSuggestion from "./components/FriendsPage/FriendsSuggestion";
 import FriendRequest from "./components/FriendsPage/FriendRequest";
 import FriendsPageHome from "./components/FriendsPage/FriendsPageHome";
+import { Toaster } from "react-hot-toast";
 
 const App = () => {
   return (
     <div className="min-h-screen">
+      <Toaster />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<Login />} />

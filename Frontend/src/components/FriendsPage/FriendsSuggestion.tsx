@@ -7,6 +7,7 @@ import {
   GET_MY_FRIENDS_QUERY,
 } from "../../GraphqlOprations/queries";
 import { SEND_FRIEND_REQUEST_MUTATION } from "../../GraphqlOprations/mutations";
+import toast from "react-hot-toast";
 
 const FriendsSuggestion = () => {
   type Person = {
@@ -71,7 +72,7 @@ const FriendsSuggestion = () => {
       const json = await res.json();
       
       if (json.errors && json.errors.length) {
-        alert(json.errors[0].message || "Failed to send friend request");
+        toast.error(json.errors[0].message || "Failed to send friend request");
         // Revert to idle status if there's an error
         setSuggestions(prev => prev.map(suggestion => 
           suggestion.id === id ? { ...suggestion, status: 'idle' as const } : suggestion
@@ -87,10 +88,10 @@ const FriendsSuggestion = () => {
       // Show success message
       const sentUser = suggestions.find(s => s.id === id);
       if (sentUser) {
-        alert(`Friend request sent to ${sentUser.firstName} ${sentUser.surname}!`);
+        toast.success(`Friend request sent to ${sentUser.firstName} ${sentUser.surname}!`);
       }
     } catch (error) {
-      alert("Failed to send friend request");
+      toast.error("Failed to send friend request");
       console.error(error);
       // Revert to idle status on error
       setSuggestions(prev => prev.map(suggestion => 

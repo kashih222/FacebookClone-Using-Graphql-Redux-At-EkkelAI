@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { LOGIN_MUTATION } from "../../GraphqlOprations/mutations";
 import { useAppDispatch } from "../../Redux Toolkit/hooks";
 import { setUser, fetchMe } from "../../Redux Toolkit/slices/userSlice";
+import toast from "react-hot-toast";
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -37,7 +38,7 @@ const Login = () => {
       });
       const json = await res.json();
       if (json.errors && json.errors.length) {
-        alert(json.errors[0].message || "Login failed");
+        toast.error(json.errors[0].message || "Login failed");
         return;
       }
       if (json.data?.login?.user) {
@@ -46,7 +47,7 @@ const Login = () => {
       dispatch(fetchMe());
       navigate("/");
     } catch {
-      alert("Network error");
+      toast.error("Network error");
     }
   };
 

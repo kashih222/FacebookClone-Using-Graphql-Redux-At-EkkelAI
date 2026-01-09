@@ -4,6 +4,7 @@ import Navbar from "../Navbar/Navbar";
 import FriendsPageSidebar from "./FriendsPageSidebar";
 import { GET_FRIEND_REQUESTS_QUERY } from "../../GraphqlOprations/queries";
 import { ACCEPT_FRIEND_REQUEST_MUTATION, REJECT_FRIEND_REQUEST_MUTATION } from "../../GraphqlOprations/mutations";
+import toast from "react-hot-toast";
 
 type FriendRequestData = {
   id: string;
@@ -70,13 +71,13 @@ const FriendRequest = () => {
       });
       const json = await res.json();
       if (json.errors && json.errors.length) {
-        alert(json.errors[0].message || "Failed to accept friend request");
+        toast.error(json.errors[0].message || "Failed to accept friend request");
         return;
       }
       // Remove from list
       setFriendRequests(prev => prev.filter(request => request.id !== requestId));
     } catch (error) {
-      alert("Failed to accept friend request");
+      toast.error("Failed to accept friend request");
       console.error(error);
     }
   };
@@ -94,13 +95,13 @@ const FriendRequest = () => {
       });
       const json = await res.json();
       if (json.errors && json.errors.length) {
-        alert(json.errors[0].message || "Failed to reject friend request");
+        toast.error(json.errors[0].message || "Failed to reject friend request");
         return;
       }
       // Remove from list
       setFriendRequests(prev => prev.filter(request => request.id !== requestId));
     } catch (error) {
-      alert("Failed to reject friend request");
+      toast.error("Failed to reject friend request");
       console.error(error);
     }
   };

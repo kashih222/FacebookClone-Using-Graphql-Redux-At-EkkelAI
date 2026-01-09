@@ -9,7 +9,6 @@ import AWS from "aws-sdk";
 dotenv.config();
 
 
-// Initialize S3 (add this near your other imports/initializations)
 const s3 = new AWS.S3({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -117,7 +116,7 @@ export const resolvers = {
               createdAt: c.createdAt.toISOString(),
             })),
           reactions: (post.reactions || [])
-            .filter((r: any) => r.user && r.user._id) // Filter out reactions with null user
+            .filter((r: any) => r.user && r.user._id) 
             .map((r: any) => ({
               user: {
                 id: r.user._id.toString(),
@@ -251,7 +250,7 @@ export const resolvers = {
       const me = await User.findById(payload.uid);
       if (!me) throw new Error("User not found");
 
-      // Get pending requests to exclude users who already sent requests
+      
       const pendingRequests = await FriendRequest.find({
         $or: [
           { from: payload.uid, status: "pending" },
@@ -835,6 +834,7 @@ export const resolvers = {
         const req = args.requests[idx];
         const safeName = req.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
         const key = `posts/${payload.uid}/${now}-${idx}-${safeName}`;
+        
         // Generate presigned PUT URL for direct upload
         const uploadUrl = await new Promise<string>((resolve, reject) => {
           (s3 as any).getSignedUrl(

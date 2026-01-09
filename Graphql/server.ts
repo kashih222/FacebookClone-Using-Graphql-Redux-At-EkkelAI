@@ -50,7 +50,7 @@ async function start() {
       } catch (error: any) {
         console.error("❌ MongoDB connection failed:");
 
-        throw error; // Re-throw to prevent server from starting without DB
+        throw error;
       }
     } else {
       console.warn("⚠️  MONGO_URI not set; skipping DB connection");
