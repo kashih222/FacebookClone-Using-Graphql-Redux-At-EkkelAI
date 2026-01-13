@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   FaFacebook,
   FaSearch,
@@ -62,10 +62,7 @@ const Navbar = () => {
               <FaFacebook className="text-blue-600 text-3xl sm:text-4xl" />
             </Link>
             {/* Search Bar - Desktop */}
-            <form
-              onSubmit={handleSearch}
-              className=" relative flex-1 "
-            >
+            <form onSubmit={handleSearch} className=" relative flex-1 ">
               <div className="relative w-50">
                 <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
@@ -93,18 +90,50 @@ const Navbar = () => {
 
           {/* Center Section: Navigation Icons - Desktop */}
           <div className="hidden md:flex items-center justify-center flex-1 space-x-2 lg:space-x-14">
-            <Link to={"/"}>
-              <button className="flex items-center justify-center w-16 lg:w-20 h-14 rounded-md hover:bg-gray-100 cursor-pointer group">
-                <FaHome className="text-2xl text-[#606366] group-hover:text-blue-600" />
-                <div className="absolute bottom-0 w-16 lg:w-20 h-1 bg-blue-600 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </button>
-            </Link>
-            <Link to={"/friends"}>
-              <button className="flex items-center justify-center w-16 lg:w-20 h-14 rounded-md hover:bg-gray-100 cursor-pointer group">
-                <FaUsers className="text-2xl text-[#606366] group-hover:text-blue-600" />
-                <div className="absolute bottom-0 w-16 lg:w-20 h-1 bg-blue-600 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </button>
-            </Link>
+            <NavLink to="/" end>
+              {({ isActive }) => (
+                <button
+                  className={`relative flex items-center justify-center w-16 lg:w-20 h-14 rounded-md cursor-pointer
+          ${isActive ? "text-blue-600" : "hover:bg-gray-100"}
+        `}
+                >
+                  <FaHome
+                    className={`text-2xl ${
+                      isActive ? "text-blue-600" : "text-[#606366]"
+                    }`}
+                  />
+
+                  {/* Active bottom bar */}
+                  <div
+                    className={`absolute bottom-0 w-16 lg:w-20 h-1 bg-blue-600 rounded-t-lg
+            ${isActive ? "opacity-100" : "opacity-0"}
+          `}
+                  />
+                </button>
+              )}
+            </NavLink>
+
+            {/* Friends */}
+            <NavLink to="/friends">
+              {({ isActive }) => (
+                <button
+                  className={`relative flex items-center justify-center w-16 lg:w-20 h-14 rounded-md cursor-pointer
+          ${isActive ? "text-blue-600" : "hover:bg-gray-100"}
+        `}
+                >
+                  <FaUsers
+                    className={`text-2xl ${
+                      isActive ? "text-blue-600" : "text-[#606366]"
+                    }`}
+                  />
+                  <div
+                    className={`absolute bottom-0 w-16 lg:w-20 h-1 bg-blue-600 rounded-t-lg
+            ${isActive ? "opacity-100" : "opacity-0"}
+          `}
+                  />
+                </button>
+              )}
+            </NavLink>
             <button className="flex items-center justify-center w-16 lg:w-20 h-14 rounded-md hover:bg-gray-100 cursor-pointer group">
               <FaPlayCircle className="text-2xl text-[#606366] group-hover:text-blue-600" />
               <div className="absolute bottom-0 w-16 lg:w-20 h-1 bg-blue-600 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -151,7 +180,10 @@ const Navbar = () => {
               <div className="absolute right-0 mt-2 w-72 lg:w-84 bg-[#FDFDFD] rounded-lg shadow-lg border border-gray-200 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                 <div className="px-4 py-3 border-b border-gray-100">
                   <div className="flex flex-col gap-4 bg-[#F2F2F2] p-3 lg:p-4 rounded-xl">
-                    <Link to={"/myprofile"} onClick={() => setIsMobileMenuOpen(false)}>
+                    <Link
+                      to={"/myprofile"}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
                       <div className="flex items-center gap-2.5 bg-[#F2F2F2]">
                         <div className="w-10 h-10 bg-linear-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
                           {(me?.firstName?.[0] || "U").toUpperCase()}
@@ -207,15 +239,20 @@ const Navbar = () => {
                   <button
                     onClick={async () => {
                       try {
-                        const res = await fetch(import.meta.env.VITE_GRAPHQL_URL, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          credentials: "include",
-                          body: JSON.stringify({ query: LOGOUT_MUTATION }),
-                        });
+                        const res = await fetch(
+                          import.meta.env.VITE_GRAPHQL_URL,
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({ query: LOGOUT_MUTATION }),
+                          }
+                        );
                         const json = await res.json();
                         if (json.errors && json.errors.length) {
-                          console.error(json.errors[0].message || "Logout failed");
+                          console.error(
+                            json.errors[0].message || "Logout failed"
+                          );
                         }
                       } catch {
                         console.error("Network error during logout");
@@ -227,7 +264,9 @@ const Navbar = () => {
                     className="w-full flex items-center px-3 lg:px-4 py-2 hover:bg-red-500 hover:text-white text-left"
                   >
                     <LogOut className="mr-2 lg:mr-3 w-5 h-5 lg:w-6 lg:h-6" />
-                    <span className="font-medium text-sm lg:text-base">Log Out</span>
+                    <span className="font-medium text-sm lg:text-base">
+                      Log Out
+                    </span>
                   </button>
                   <div className="flex flex-wrap gap-2 py-2 px-3 lg:px-4 text-xs lg:text-sm text-gray-700">
                     <a className="hover:underline" href="#">
@@ -253,16 +292,20 @@ const Navbar = () => {
           </div>
         </div>
 
-       
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
-          <div className="md:hidden fixed inset-0  bg-opacity-50 z-40" onClick={toggleMobileMenu}></div>
+          <div
+            className="md:hidden fixed inset-0  bg-opacity-50 z-40"
+            onClick={toggleMobileMenu}
+          ></div>
         )}
 
         {/* Mobile Menu Sidebar */}
-        <div className={`md:hidden fixed top-14 right-0 h-[calc(100vh-56px)] w-80 bg-white shadow-xl transform transition-transform duration-300 z-40 ${
-          isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}>
+        <div
+          className={`md:hidden fixed top-14 right-0 h-[calc(100vh-56px)] w-80 bg-white shadow-xl transform transition-transform duration-300 z-40 ${
+            isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
           <div className="h-full overflow-y-auto py-4">
             {/* User Profile Section */}
             <div className="px-4 py-3 border-b border-gray-200">
@@ -283,27 +326,59 @@ const Navbar = () => {
 
             {/* Navigation Links */}
             <div className="py-4">
-              <div className="px-4 font-semibold text-gray-500 text-sm mb-2">MENU</div>
-              <Link to={"/"} onClick={toggleMobileMenu}>
-                <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100">
-                  <FaHome className="text-2xl text-blue-600" />
-                  <span className="font-medium">Home</span>
-                </div>
-              </Link>
-              <Link to={"/friends"} onClick={toggleMobileMenu}>
-                <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100">
-                  <FaUsers className="text-2xl text-blue-500" />
-                  <span className="font-medium">Friends</span>
-                </div>
-              </Link>
+              <div className="px-4 font-semibold text-gray-500 text-sm mb-2">
+                MENU
+              </div>
+
+              {/* Home */}
+              <NavLink to="/" onClick={toggleMobileMenu}>
+                {({ isActive }) => (
+                  <div
+                    className={`flex items-center gap-3 px-4 py-3
+          ${
+            isActive
+              ? "border-b-2 border-blue-600 text-blue-600"
+              : "hover:bg-gray-100"
+          }
+        `}
+                  >
+                    <FaHome className="text-2xl" />
+                    <span className="font-medium">Home</span>
+                  </div>
+                )}
+              </NavLink>
+
+              {/* Friends */}
+              <NavLink to="/friends" onClick={toggleMobileMenu}>
+                {({ isActive }) => (
+                  <div
+                    className={`flex items-center gap-3 px-4 py-3
+          ${
+            isActive
+              ? "border-b-2 border-blue-600 text-blue-600"
+              : "hover:bg-gray-100"
+          }
+        `}
+                  >
+                    <FaUsers className="text-2xl" />
+                    <span className="font-medium">Friends</span>
+                  </div>
+                )}
+              </NavLink>
+
+              {/* Watch */}
               <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100">
                 <FaPlayCircle className="text-2xl text-red-500" />
                 <span className="font-medium">Watch</span>
               </div>
+
+              {/* Marketplace */}
               <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100">
                 <FaStore className="text-2xl text-blue-700" />
                 <span className="font-medium">Marketplace</span>
               </div>
+
+              {/* Gaming */}
               <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100">
                 <FaGamepad className="text-2xl text-green-500" />
                 <span className="font-medium">Gaming</span>
@@ -312,7 +387,9 @@ const Navbar = () => {
 
             {/* Settings Section */}
             <div className="py-4 border-t border-gray-200">
-              <div className="px-4 font-semibold text-gray-500 text-sm mb-2">SETTINGS</div>
+              <div className="px-4 font-semibold text-gray-500 text-sm mb-2">
+                SETTINGS
+              </div>
               <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100">
                 <Settings className="text-gray-700" />
                 <span className="font-medium">Settings & Privacy</span>

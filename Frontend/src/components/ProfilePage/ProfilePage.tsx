@@ -41,7 +41,7 @@ export interface User {
 interface Post {
   imageUrl?: string;
   imageUrls?: string[];
-} 
+}
 
 const ProfilePage = () => {
   const personalFeedRef = useRef<{ refresh: () => void } | null>(null);
@@ -140,12 +140,11 @@ const ProfilePage = () => {
       // Get the converted URLs from the mutation response
       const convertedUrls = viewUrlsJson.data?.getViewUrls || [];
 
-      // Filter out any null/empty values
       const validUrls = convertedUrls.filter(
         (url: string) => url && url.trim() !== ""
       );
 
-      setPhotos(validUrls.slice(0, 9)); // Limit to 9 images for display
+      setPhotos(validUrls.slice(0, 9));
 
       console.log("Loaded photos:", validUrls.length, "converted images");
     } catch (err) {
@@ -236,7 +235,7 @@ const ProfilePage = () => {
                       {displayName}
                     </h1>
                     <p className="text-gray-600 mt-1">
-                      0 followers  {friendsCount} friends
+                      0 followers {friendsCount} friends
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -366,7 +365,7 @@ const ProfilePage = () => {
                           alt={`Photo ${i + 1}`}
                           onError={(e) => {
                             const img = e.target as HTMLImageElement;
-                          
+
                             img.src =
                               "https://via.placeholder.com/150?text=Image+Error";
                           }}
