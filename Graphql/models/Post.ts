@@ -12,26 +12,7 @@ const postSchema = new Schema({
     type: [String],
     default: [],
   },
-  comments: [
-    {
-      author: { type: Schema.Types.ObjectId, ref: "User", required: true },
-      content: { type: String, required: true },
-      createdAt: { type: Date, default: Date.now },
-    },
-  ],
-  reactions: [
-    {
-      user: { type: Schema.Types.ObjectId, ref: "User", required: true },
-      type: {
-        type: String,
-        enum: ["like", "love", "haha", "wow", "sad", "angry"],
-        required: true,
-      },
-      createdAt: { type: Date, default: Date.now },
-    },
-  ],
   author: { type: Schema.Types.ObjectId, ref: "User", required: true },
-
   createdAt: { type: Date, default: Date.now },
 });
 

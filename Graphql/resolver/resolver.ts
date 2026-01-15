@@ -1,10 +1,13 @@
 import { User } from "../models/User";
 import { Post } from "../models/Post";
 import { FriendRequest } from "../models/FriendRequest";
+import { Comment } from "../models/Comment";
+import { Reaction } from "../models/Reaction";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import AWS from "aws-sdk";
+import { requireAuth, GraphQLContext } from "../Middleware/authMiddleware";
 
 dotenv.config();
 
@@ -48,29 +51,84 @@ function summarizeReactions(reactions: any[]) {
   );
 }
 
+async function formatPostWithRelations(post: any) {
+  const postId = post._id.toString();
+  
+  const [comments, reactions] = await Promise.all([
+    Comment.find({ post: postId })
+      .populate("author")
+      .sort({ createdAt: 1 }),
+    Reaction.find({ post: postId })
+      .populate("user")
+      .sort({ createdAt: -1 }),
+  ]);
+
+  return {
+    id: post._id.toString(),
+    content: post.content,
+    imageUrl: post.imageUrl,
+    imageUrls: post.imageUrls || [],
+    author: {
+      id: post.author._id.toString(),
+      firstName: post.author.firstName,
+      surname: post.author.surname,
+      email: post.author.email,
+      dob: post.author.dob?.toISOString() || new Date().toISOString(),
+      gender: post.author.gender || "",
+      createdAt: post.author.createdAt?.toISOString() || new Date().toISOString(),
+    },
+    createdAt: post.createdAt.toISOString(),
+    comments: comments
+      .filter((c: any) => c.author && c.author._id)
+      .map((c: any) => ({
+        id: c._id.toString(),
+        content: c.content,
+        author: {
+          id: c.author._id.toString(),
+          firstName: c.author.firstName,
+          surname: c.author.surname,
+          email: c.author.email,
+          dob: c.author.dob?.toISOString() || new Date().toISOString(),
+          gender: c.author.gender || "",
+          createdAt: c.author.createdAt?.toISOString() || new Date().toISOString(),
+        },
+        createdAt: c.createdAt.toISOString(),
+      })),
+    reactions: reactions
+      .filter((r: any) => r.user && r.user._id)
+      .map((r: any) => ({
+        user: {
+          id: r.user._id.toString(),
+          firstName: r.user.firstName,
+          surname: r.user.surname,
+          email: r.user.email,
+          dob: r.user.dob?.toISOString() || new Date().toISOString(),
+          gender: r.user.gender || "",
+          createdAt: r.user.createdAt?.toISOString() || new Date().toISOString(),
+        },
+        type: r.type,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    reactionSummary: summarizeReactions(reactions),
+  };
+}
+
 export const resolvers = {
   Query: {
     // logedin User Info
-    me: async (_: unknown, __: unknown, ctx: any) => {
-      try {
-        const token = ctx.req?.cookies?.token;
-        if (!token) return null;
-        const secret = process.env.JWT_SECRET || "devsecret";
-        const payload = jwt.verify(token, secret) as { uid: string };
-        const user = await User.findById(payload.uid);
-        if (!user) return null;
-        return {
-          id: user._id.toString(),
-          firstName: user.firstName,
-          surname: user.surname,
-          email: user.email,
-          dob: user.dob.toISOString(),
-          gender: user.gender,
-          createdAt: user.createdAt.toISOString(),
-        };
-      } catch {
-        return null;
-      }
+    me: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      if (!ctx.auth || !ctx.auth.uid) return null;
+      const user = await User.findById(ctx.auth.uid);
+      if (!user) return null;
+      return {
+        id: user._id.toString(),
+        firstName: user.firstName,
+        surname: user.surname,
+        email: user.email,
+        dob: user.dob.toISOString(),
+        gender: user.gender,
+        createdAt: user.createdAt.toISOString(),
+      };
     },
 
    
@@ -79,127 +137,32 @@ export const resolvers = {
     posts: async () => {
       const posts = await Post.find()
         .sort({ createdAt: -1 })
-        .populate("author")
-        .populate("comments.author")
-        .populate("reactions.user");
-      return posts
-        .filter((post: any) => post.author && post.author._id) // Filter out posts with null author
-        .map((post: any) => ({
-          id: post._id.toString(),
-          content: post.content,
-          imageUrl: post.imageUrl,
-          imageUrls: post.imageUrls || [],
-          author: {
-            id: post.author._id.toString(),
-            firstName: post.author.firstName,
-            surname: post.author.surname,
-            email: post.author.email,
-            dob: post.author.dob?.toISOString() || new Date().toISOString(),
-            gender: post.author.gender || "",
-            createdAt: post.author.createdAt?.toISOString() || new Date().toISOString(),
-          },
-          createdAt: post.createdAt.toISOString(),
-          comments: (post.comments || [])
-            .filter((c: any) => c.author && c.author._id) // Filter out comments with null author
-            .map((c: any) => ({
-              id: c._id.toString(),
-              content: c.content,
-              author: {
-                id: c.author._id.toString(),
-                firstName: c.author.firstName,
-                surname: c.author.surname,
-                email: c.author.email,
-                dob: c.author.dob?.toISOString() || new Date().toISOString(),
-                gender: c.author.gender || "",
-                createdAt: c.author.createdAt?.toISOString() || new Date().toISOString(),
-              },
-              createdAt: c.createdAt.toISOString(),
-            })),
-          reactions: (post.reactions || [])
-            .filter((r: any) => r.user && r.user._id) 
-            .map((r: any) => ({
-              user: {
-                id: r.user._id.toString(),
-                firstName: r.user.firstName,
-                surname: r.user.surname,
-                email: r.user.email,
-                dob: r.user.dob?.toISOString() || new Date().toISOString(),
-                gender: r.user.gender || "",
-                createdAt: r.user.createdAt?.toISOString() || new Date().toISOString(),
-              },
-              type: r.type,
-              createdAt: r.createdAt.toISOString(),
-            })),
-          reactionSummary: summarizeReactions(post.reactions || []),
-        }));
+        .populate("author");
+      
+      const formattedPosts = await Promise.all(
+        posts
+          .filter((post: any) => post.author && post.author._id)
+          .map((post: any) => formatPostWithRelations(post))
+      );
+      
+      return formattedPosts;
     },
 
     // Fetch my posts
-    myPosts: async (_: unknown, __: unknown, ctx: any) => {
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      const payload = jwt.verify(token, secret) as { uid: string };
-      const authorId = payload.uid;
+    myPosts: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      const authorId = requireAuth(ctx);
 
       const posts = await Post.find({ author: authorId })
         .sort({ createdAt: -1 })
-        .populate("author")
-        .populate("comments.author")
-        .populate("reactions.user");
+        .populate("author");
       
-      return posts
-        .filter((post: any) => post.author && post.author._id) 
-        .map((post: any) => ({
-          id: post._id.toString(),
-          content: post.content,
-          imageUrl: post.imageUrl,
-          imageUrls: post.imageUrls || [],
-          author: {
-            id: post.author._id.toString(),
-            firstName: post.author.firstName,
-            surname: post.author.surname,
-            email: post.author.email,
-            dob: post.author.dob?.toISOString() || new Date().toISOString(),
-            gender: post.author.gender || "",
-            createdAt: post.author.createdAt?.toISOString() || new Date().toISOString(),
-          },
-          createdAt: post.createdAt.toISOString(),
-          comments: (post.comments || [])
-            .filter((c: any) => c.author && c.author._id) 
-            .map((c: any) => ({
-              id: c._id.toString(),
-              author: {
-                id: c.author._id.toString(),
-                firstName: c.author.firstName,
-                surname: c.author.surname,
-                email: c.author.email,
-                dob: c.author.dob?.toISOString() || new Date().toISOString(),
-                gender: c.author.gender || "",
-                createdAt: c.author.createdAt?.toISOString() || new Date().toISOString(),
-              },
-              content: c.content,
-              createdAt: c.createdAt.toISOString(),
-            })),
-          reactions: (post.reactions || [])
-            .filter((r: any) => r.user && r.user._id) 
-            .map((r: any) => ({
-              user: {
-                id: r.user._id.toString(),
-                firstName: r.user.firstName,
-                surname: r.user.surname,
-                email: r.user.email,
-                dob: r.user.dob?.toISOString() || new Date().toISOString(),
-                gender: r.user.gender || "",
-                createdAt: r.user.createdAt?.toISOString() || new Date().toISOString(),
-              },
-              type: r.type,
-              createdAt: r.createdAt.toISOString(),
-            })),
-          reactionSummary: summarizeReactions(post.reactions || []),
-        }));
+      const formattedPosts = await Promise.all(
+        posts
+          .filter((post: any) => post.author && post.author._id)
+          .map((post: any) => formatPostWithRelations(post))
+      );
+      
+      return formattedPosts;
     },
 
     // All users
@@ -216,14 +179,9 @@ export const resolvers = {
     },
 
     // My friends
-    myFriends: async (_: unknown, __: unknown, ctx: any) => {
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      const payload = jwt.verify(token, secret) as { uid: string };
-      const me = await User.findById(payload.uid).populate("friends");
+    myFriends: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      const userId = requireAuth(ctx);
+      const me = await User.findById(userId).populate("friends");
       if (!me) throw new Error("User not found");
       const friends = (me.friends as any[]) || [];
       return friends
@@ -240,21 +198,16 @@ export const resolvers = {
     },
 
     // Friend suggestions
-    friendSuggestions: async (_: unknown, __: unknown, ctx: any) => {
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      const payload = jwt.verify(token, secret) as { uid: string };
-      const me = await User.findById(payload.uid);
+    friendSuggestions: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      const userId = requireAuth(ctx);
+      const me = await User.findById(userId);
       if (!me) throw new Error("User not found");
 
       
       const pendingRequests = await FriendRequest.find({
         $or: [
-          { from: payload.uid, status: "pending" },
-          { to: payload.uid, status: "pending" },
+          { from: userId, status: "pending" },
+          { to: userId, status: "pending" },
         ],
       });
       const requestUserIds = new Set<string>();
@@ -264,12 +217,11 @@ export const resolvers = {
       });
 
       const excludeIds = new Set<string>([
-        payload.uid,
+        userId,
         ...me.friends.map((f) => f.toString()),
         ...Array.from(requestUserIds),
       ]);
       const users = await User.find({ _id: { $nin: Array.from(excludeIds) } });
-      // Shuffle
       for (let i = users.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [users[i], users[j]] = [users[j], users[i]];
@@ -285,16 +237,11 @@ export const resolvers = {
     },
 
     // Get friend requests (incoming)
-    friendRequests: async (_: unknown, __: unknown, ctx: any) => {
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      const payload = jwt.verify(token, secret) as { uid: string };
+    friendRequests: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      const userId = requireAuth(ctx);
 
       const requests = await FriendRequest.find({
-        to: payload.uid,
+        to: userId,
         status: "pending",
       })
         .populate("from")
@@ -314,7 +261,7 @@ export const resolvers = {
             createdAt: req.from.createdAt?.toISOString() || new Date().toISOString(),
           },
           to: {
-            id: payload.uid,
+            id: userId,
             firstName: "",
             surname: "",
             email: "",
@@ -374,11 +321,7 @@ export const resolvers = {
     },
 
     //Login User
-    login: async (
-      _: unknown,
-      args: { email: string; password: string },
-      ctx: any
-    ) => {
+    login: async (_: unknown, args: { email: string; password: string }, ctx: GraphQLContext ) => {
       const { email, password } = args;
       const user = await User.findOne({ email });
       if (!user) {
@@ -414,7 +357,7 @@ export const resolvers = {
       };
     },
     // LogOut USer
-    logout: async (_: unknown, __: unknown, ctx: any) => {
+    logout: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       if (ctx.res) {
         ctx.res.clearCookie("token", {
           httpOnly: true,
@@ -432,60 +375,32 @@ export const resolvers = {
       args: {
         input: { content: string; imageUrl?: string; imageUrls?: string[] };
       },
-      ctx: any
+      ctx: GraphQLContext
     ) => {
       console.log("heloooooooooooooooooooooooo");
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      const payload = jwt.verify(token, secret) as { uid: string };
-      const authorId = payload.uid;
+      const authorId = requireAuth(ctx);
       const created = await Post.create({
         content: args.input.content,
         imageUrl: args.input.imageUrl || null,
         imageUrls: args.input.imageUrls || [],
         author: authorId,
       });
-      const user = await User.findById(authorId);
-      if (!user) {
-        throw new Error("User not found");
+      const populated = await Post.findById(created._id).populate("author");
+      if (!populated || !populated.author) {
+        throw new Error("Post or author not found after creation");
       }
-      return {
-        id: created._id.toString(),
-        content: created.content,
-        imageUrl: created.imageUrl || null,
-        imageUrls: created.imageUrls || [],
-        author: {
-          id: user._id.toString(),
-          firstName: user.firstName,
-          surname: user.surname,
-          email: user.email,
-          dob: user.dob.toISOString(),
-          gender: user.gender,
-          createdAt: user.createdAt.toISOString(),
-        },
-        createdAt: created.createdAt.toISOString(),
-        comments: [],
-        reactions: [],
-        reactionSummary: summarizeReactions([]),
-      };
+      
+      return formatPostWithRelations(populated);
     },
+    
     // Add Coment
     addComment: async (
       _: unknown,
       args: { input: { postId: string; content: string } },
-      ctx: any
+      ctx: GraphQLContext
     ) => {
       console.log("hehhehehehe")
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      const payload = jwt.verify(token, secret) as { uid: string };
-      const authorId = payload.uid;
+      const authorId = requireAuth(ctx);
       const postId = args.input.postId;
       const rawContent = args.input.content;
       const content = typeof rawContent === "string" ? rawContent.trim() : "";
@@ -511,173 +426,61 @@ export const resolvers = {
 
       console.log("args",args)
 
-      post.comments.push({
+      await Comment.create({
+        post: postId,
         author: authorId,
         content,
-        createdAt: new Date(),
-      } as any);
-      await post.save();
-      const populated = await Post.findById(post._id)
-        .populate("author")
-        .populate("comments.author")
-        .populate("reactions.user");
-      const p: any = populated;
-      if (!p || !p.author || !p.author._id) {
+      });
+
+      const populated = await Post.findById(postId).populate("author");
+      if (!populated || !populated.author) {
         throw new Error("Post or author not found after update");
       }
-      return {
-        id: p._id.toString(),
-        content: p.content,
-        imageUrl: p.imageUrl,
-        imageUrls: p.imageUrls || [],
-        author: {
-          id: p.author._id.toString(),
-          firstName: p.author.firstName,
-          surname: p.author.surname,
-          email: p.author.email,
-          dob: p.author.dob?.toISOString() || new Date().toISOString(),
-          gender: p.author.gender || "",
-          createdAt: p.author.createdAt?.toISOString() || new Date().toISOString(),
-        },
-        createdAt: p.createdAt.toISOString(),
-        comments: (p.comments || [])
-          .filter((c: any) => c.author && c.author._id) 
-          .map((c: any) => ({
-            id: c._id.toString(),
-            author: {
-              id: c.author._id.toString(),
-              firstName: c.author.firstName,
-              surname: c.author.surname,
-              email: c.author.email,
-              dob: c.author.dob?.toISOString() || new Date().toISOString(),
-              gender: c.author.gender || "",
-              createdAt: c.author.createdAt?.toISOString() || new Date().toISOString(),
-            },
-            content: c.content,
-            createdAt: c.createdAt.toISOString(),
-          })),
-        reactions: (p.reactions || [])
-          .filter((r: any) => r.user && r.user._id) 
-          .map((r: any) => ({
-            user: {
-              id: r.user._id.toString(),
-              firstName: r.user.firstName,
-              surname: r.user.surname,
-              email: r.user.email,
-              dob: r.user.dob?.toISOString() || new Date().toISOString(),
-              gender: r.user.gender || "",
-              createdAt: r.user.createdAt?.toISOString() || new Date().toISOString(),
-            },
-            type: r.type,
-            createdAt: r.createdAt.toISOString(),
-          })),
-        reactionSummary: summarizeReactions(p.reactions || []),
-      };
+      
+      return formatPostWithRelations(populated);
     },
 
     // post Recation
     reactPost: async (
-      _: unknown,
-      args: { input: { postId: string; type: string } },
-      ctx: any
-    ) => {
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      const payload = jwt.verify(token, secret) as { uid: string };
-      const userId = payload.uid;
+      _: unknown, args: { input: { postId: string; type: string } }, ctx: GraphQLContext ) => {
+      const userId = requireAuth(ctx);
       const post = await Post.findById(args.input.postId);
       if (!post) {
         throw new Error("Post not found");
       }
-      const existingIndex = (post.reactions || []).findIndex(
-        (r: any) => r.user.toString() === userId
-      );
-      if (existingIndex !== -1) {
-        const existing = (post.reactions as any[])[existingIndex];
-        if (existing.type === args.input.type) {
-          (post.reactions as any[]).splice(existingIndex, 1);
+
+      const existingReaction = await Reaction.findOne({
+        post: args.input.postId,
+        user: userId,
+      });
+
+      if (existingReaction) {
+        if (existingReaction.type === args.input.type) {
+          await Reaction.deleteOne({ _id: existingReaction._id });
         } else {
-          existing.type = args.input.type;
-          existing.createdAt = new Date();
+          existingReaction.type = args.input.type;
+          existingReaction.createdAt = new Date();
+          await existingReaction.save();
         }
       } else {
-        post.reactions.push({
+        await Reaction.create({
+          post: args.input.postId,
           user: userId,
           type: args.input.type,
-          createdAt: new Date(),
-        } as any);
+        });
       }
-      await post.save();
-      const populated = await Post.findById(post._id)
-        .populate("author")
-        .populate("comments.author")
-        .populate("reactions.user");
-      const p: any = populated;
-      if (!p || !p.author || !p.author._id) {
+
+      const populated = await Post.findById(args.input.postId).populate("author");
+      if (!populated || !populated.author) {
         throw new Error("Post or author not found after update");
       }
-      return {
-        id: p._id.toString(),
-        content: p.content,
-        imageUrl: p.imageUrl,
-        imageUrls: p.imageUrls || [],
-        author: {
-          id: p.author._id.toString(),
-          firstName: p.author.firstName,
-          surname: p.author.surname,
-          email: p.author.email,
-          dob: p.author.dob?.toISOString() || new Date().toISOString(),
-          gender: p.author.gender || "",
-          createdAt: p.author.createdAt?.toISOString() || new Date().toISOString(),
-        },
-        createdAt: p.createdAt.toISOString(),
-        comments: (p.comments || [])
-          .filter((c: any) => c.author && c.author._id) 
-          .map((c: any) => ({
-            id: c._id.toString(),
-            author: {
-              id: c.author._id.toString(),
-              firstName: c.author.firstName,
-              surname: c.author.surname,
-              email: c.author.email,
-              dob: c.author.dob?.toISOString() || new Date().toISOString(),
-              gender: c.author.gender || "",
-              createdAt: c.author.createdAt?.toISOString() || new Date().toISOString(),
-            },
-            content: c.content,
-            createdAt: c.createdAt.toISOString(),
-          })),
-        reactions: (p.reactions || [])
-          .filter((r: any) => r.user && r.user._id) // Filter out reactions with null user
-          .map((r: any) => ({
-            user: {
-              id: r.user._id.toString(),
-              firstName: r.user.firstName,
-              surname: r.user.surname,
-              email: r.user.email,
-              dob: r.user.dob?.toISOString() || new Date().toISOString(),
-              gender: r.user.gender || "",
-              createdAt: r.user.createdAt?.toISOString() || new Date().toISOString(),
-            },
-            type: r.type,
-            createdAt: r.createdAt.toISOString(),
-          })),
-        reactionSummary: summarizeReactions(p.reactions || []),
-      };
+      
+      return formatPostWithRelations(populated);
     },
 
     // Add friend
-    addFriend: async (_: unknown, args: { userId: string }, ctx: any) => {
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      const payload = jwt.verify(token, secret) as { uid: string };
-      const meId = payload.uid;
+    addFriend: async (_: unknown, args: { userId: string }, ctx: GraphQLContext) => {
+      const meId = requireAuth(ctx);
       if (args.userId === meId) {
         throw new Error("Cannot add yourself");
       }
@@ -697,18 +500,8 @@ export const resolvers = {
     },
 
     // Send friend request
-    sendFriendRequest: async (
-      _: unknown,
-      args: { userId: string },
-      ctx: any
-    ) => {
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      const payload = jwt.verify(token, secret) as { uid: string };
-      const meId = payload.uid;
+    sendFriendRequest: async ( _: unknown,  args: { userId: string },  ctx: GraphQLContext ) => {
+      const meId = requireAuth(ctx);
 
       if (args.userId === meId) {
         throw new Error("Cannot send request to yourself");
@@ -748,15 +541,9 @@ export const resolvers = {
     acceptFriendRequest: async (
       _: unknown,
       args: { requestId: string },
-      ctx: any
+      ctx: GraphQLContext
     ) => {
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      const payload = jwt.verify(token, secret) as { uid: string };
-      const meId = payload.uid;
+      const meId = requireAuth(ctx);
 
       const request = await FriendRequest.findById(args.requestId);
       if (!request) {
@@ -790,15 +577,9 @@ export const resolvers = {
     rejectFriendRequest: async (
       _: unknown,
       args: { requestId: string },
-      ctx: any
+      ctx: GraphQLContext
     ) => {
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      const payload = jwt.verify(token, secret) as { uid: string };
-      const meId = payload.uid;
+      const meId = requireAuth(ctx);
 
       const request = await FriendRequest.findById(args.requestId);
       if (!request) {
@@ -818,14 +599,9 @@ export const resolvers = {
     getUploadTargets: async (
       _: unknown,
       args: { requests: Array<{ filename: string; contentType: string }> },
-      ctx: { req?: { cookies?: { token?: string } } }
+      ctx: GraphQLContext
     ) => {
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      const payload = jwt.verify(token, secret) as { uid: string };
+      const userId = requireAuth(ctx);
       const bucket = process.env.AWS_BUCKET_NAME;
       const region = process.env.AWS_REGION;
       const now = Date.now();
@@ -833,7 +609,7 @@ export const resolvers = {
       for (let idx = 0; idx < args.requests.length; idx++) {
         const req = args.requests[idx];
         const safeName = req.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const key = `posts/${payload.uid}/${now}-${idx}-${safeName}`;
+        const key = `posts/${userId}/${now}-${idx}-${safeName}`;
         
         // Generate presigned PUT URL for direct upload
         const uploadUrl = await new Promise<string>((resolve, reject) => {
@@ -860,14 +636,9 @@ export const resolvers = {
     getViewUrls: async (
       _: unknown,
       args: { urls: string[] },
-      ctx: { req?: { cookies?: { token?: string } } }
+      ctx: GraphQLContext
     ) => {
-      const token = ctx.req?.cookies?.token;
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-      const secret = process.env.JWT_SECRET || "devsecret";
-      jwt.verify(token, secret);
+      requireAuth(ctx);
       const bucket = process.env.AWS_BUCKET_NAME || "gp-bucket-001";
       const signed: string[] = [];
       for (const url of args.urls) {

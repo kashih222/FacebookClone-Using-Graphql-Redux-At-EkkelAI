@@ -2,11 +2,10 @@ import { useEffect, useState } from "react";
 
   const MediaItem: React.FC<{ url: string; className: string; alt: string }> = ({ url, className, alt }) => {
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
-    const isPDF = /\.pdf$/i.test(url);
     const isImage = /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(url);
     useEffect(() => {
       let localBlobUrl: string | null = null;
-      if ((isPDF || isImage) && url) {
+      if (( isImage) && url) {
       
         fetch(url, { method: "GET", mode: "cors" })
           .then((response) => {

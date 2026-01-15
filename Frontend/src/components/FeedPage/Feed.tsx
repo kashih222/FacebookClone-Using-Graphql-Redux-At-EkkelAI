@@ -1,9 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Post from "../CreatePostPage/PostPage/Post";
 import { GET_ALL_POSTS_QUERY } from "../../GraphqlOprations/queries";
-import {
-  REACT_POST_MUTATION,
-} from "../../GraphqlOprations/mutations";
+import {REACT_POST_MUTATION } from "../../GraphqlOprations/mutations";
 import { GET_VIEW_URLS_MUTATION } from "../../GraphqlOprations/queries";
 
 interface FeedProps {

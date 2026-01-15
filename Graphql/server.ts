@@ -8,6 +8,7 @@ import { json as expressJson } from "express";
 import cookieParser from "cookie-parser";
 import { typeDefs } from "./schema/typesdef";
 import { resolvers } from "./resolver/resolver";
+import { authenticate } from "./Middleware/authMiddleware";
 
 dotenv.config();
 
@@ -36,11 +37,19 @@ async function start() {
     await server.start();
 
     app.use(
-      "/graphql",
-      expressMiddleware(server, {
-        context: async ({ req, res }) => ({ req, res }),
-      })
-    );
+  "/graphql",
+  expressMiddleware(server, {
+    context: async ({ req, res }) => {
+      const auth = authenticate(req);
+
+      return {
+        req,
+        res,
+        auth, 
+      };
+    },
+  })
+);
 
     const mongoUri = process.env.MONGO_URI;
     if (mongoUri) {
