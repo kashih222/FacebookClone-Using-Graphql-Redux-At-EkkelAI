@@ -268,13 +268,13 @@ const ProfilePage = () => {
                     <button className="flex items-center pt-3 sm:pt-4 px-2 sm:px-4 text-xs sm:text-sm cursor-pointer font-semibold text-gray-500 hover:text-gray-800 whitespace-nowrap">
                       Photos
                     </button>
-                    <button className="flex items-center pt-3 sm:pt-4 px-2 sm:px-4 text-xs sm:text-sm cursor-pointer font-semibold text-gray-500 hover:text-gray-800 whitespace-nowrap hidden md:flex">
+                    <button className=" items-center pt-3 sm:pt-4 px-2 sm:px-4 text-xs sm:text-sm cursor-pointer font-semibold text-gray-500 hover:text-gray-800 whitespace-nowrap hidden md:flex">
                       Group
                     </button>
-                    <button className="flex items-center pt-3 sm:pt-4 px-2 sm:px-4 text-xs sm:text-sm cursor-pointer font-semibold text-gray-500 hover:text-gray-800 whitespace-nowrap hidden lg:flex">
+                    <button className=" items-center pt-3 sm:pt-4 px-2 sm:px-4 text-xs sm:text-sm cursor-pointer font-semibold text-gray-500 hover:text-gray-800 whitespace-nowrap hidden lg:flex">
                       Events
                     </button>
-                    <button className="flex items-center pt-3 sm:pt-4 px-2 sm:px-4 text-xs sm:text-sm cursor-pointer font-semibold text-gray-500 hover:text-gray-800 whitespace-nowrap hidden lg:flex">
+                    <button className=" items-center pt-3 sm:pt-4 px-2 sm:px-4 text-xs sm:text-sm cursor-pointer font-semibold text-gray-500 hover:text-gray-800 whitespace-nowrap hidden lg:flex">
                       <span>More</span>
                       <ChevronDown className="w-3 sm:w-4" />
                     </button>

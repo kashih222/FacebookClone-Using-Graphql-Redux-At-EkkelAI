@@ -90,7 +90,7 @@ const Navbar = () => {
           </button>
 
           {/* Center Section: Navigation Icons - Desktop */}
-          <div className="hidden md:flex items-center justify-center flex-1 space-x-2 lg:space-x-14">
+          <div className="hidden md:flex items-center justify-center flex-1 space-x-2 lg:space-x-12">
             <NavLink to="/" end>
               {({ isActive }) => (
                 <button
